@@ -1,0 +1,595 @@
+---
+title: "League of Legends Prediction Model"
+subtitle: "Predicting Match Outcome From 10-Minute Team Stats"
+author: "Taylor MacKenzie"
+date: "UCSB Winter 2026"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = "center")
+library(corrplot)  # for the correlation plot
+library(discrim)  # for linear discriminant analysis
+library(corrr)   # for calculating correlation
+library(knitr)   # to help with the knitting process
+library(MASS)    # to assist with the markdown processes
+library(tidyverse)   # using tidyverse and tidymodels for this project mostly
+library(tidymodels)
+library(ggplot2)   # for most of our visualizations
+library(ggrepel)
+library(ggimage)
+library(rpart.plot)  # for visualizing trees
+library(vip)    # for variable importance 
+library(visdat) # will be used for missing data visuals
+library(vembedr)     # for embedding links
+library(janitor)     # for cleaning out our data
+library(randomForest)   # for building our randomForest
+library(stringr)    # for matching strings
+library("dplyr")     # for basic r functions
+library("yardstick") # for measuring certain metrics
+library(glmnet)
+library(ranger)
+tidymodels_prefer()
+```
+
+# Introduction
+
+In League of Legends, teams often decide whether a match is “winnable” before the 15-minute surrender window. The aim of this project is to build a machine learning model that can predict the outcome of a League of Legends game within the first 10 minutes. To do this, we will be using a data set from Kaggle titled `high_diamond_ranked_10min` (link below) that takes data from high ranked League of Legends matches, specifically from Diamond 1 to Master. (For reference: the ranks in League of Legends go from Iron --\> Bronze --\> Silver --\> Gold --\> Platinum --\> Emerald --\> Diamond --\> Master --\> Grandmaster --\> Challenger). We will be implementing multiple techniques in order to yield the most accurate model for this binary classification problem. With that being said, let's get started!
+
+```{r, echo = FALSE, out.width = "50%", fig.align="center", fig.cap="Welcome to Summoner's Rift!", fig.alt="League of Legends Title Screen"}
+knitr::include_graphics("titlescreen.png")
+```
+
+# Data Source & Citation
+
+
+Dataset: “League of Legends Diamond Ranked Games (10 min)”, accessed from Kaggle.
+
+**Link:** <https://www.kaggle.com/datasets/bobbyscience/league-of-legends-diamond-ranked-games-10-min/data>
+
+**Citation (example):**\
+Kaggle user *bobbyscience*. (n.d.). *League of Legends Diamond Ranked Games (10 min)* [Data set]. Kaggle. (Accessed 2026-01-25).
+
+# What is League of Legends and how does one win?
+
+League of Legends is a very popular, free-to-play, competitive multiplayer online battle arena or MOBA for short. Developed by Riot Games, it features two teams of five players, blue team and red team, who control unique "champions" in the goal of destroying the enemy base's Nexus. Once a nexus is destroyed, the team that destroyed it wins the game. However, there is a lot more to it than just destroying the Nexus, as you cannot do it at the beginning of the game. It is a fast-paced game requiring a combination of strategic, long-term planning with real-time combat on the map that is called the Summoner's Rift. There are essentially 3 key components to winning a game in LoL and they are: gameplay mechanics, map & objectives, and the roles the players choose. For the gameplay mechanics, players choose from over 150 champions, earning gold by killing minions, monsters and enemy players in order to buy items that increase power. Simultaneously, it is wise for players to pay attention to the map which features three unique primary lanes: Top, Middle, and Bottom as well as a roaming environment called the Jungle. Each primary lane has defensive towers for both sides, 2 outer turrets (called Tier 1 and Tier 2 turrets), an inner turret, and an inhibitor, which spawns "super minions" that destroy enemy minions and towers faster. For the sake of this analysis, however, our main focus will be on the Tier 1 towers, given that we are looking at the first 10 minutes of the game. These Tier 1 towers are situated at the outermost point of the lane corresponding with the red and blue side (see image below). The third key component to winning a game involves the role each player chooses to play. There are 5 total roles corresponding to the five different players: Top laner, Mid laner, Jungler, and two players in the bottom lane, ADC (AD Carry or Attack Damage Carry) and Support. These roles work together in the goal of destroying the team's Nexus by managing resources, securing map objectives like turrets, dragons, and in later stages, the Baron Nasher. With that being said, our main focus in this analysis are the objectives and opportunities that are obtainable within the first ten minutes of the game. This helps us decide what we need to focus on when it comes to our EDA or Exploratory Data Analysis later on. Therefore, we will be focusing on objectives like: towers, rift herald (which comes before Baron Nasher), dragons, elite monsters (the bigger "minions" within the jungle), the regular jungle minions, and regular minions. The term "minions" is portrayed through the label of CS which translates directly into the amount of gold one has or obtains. Other things that we will focus on are kills, and number of wins. There are also other variables that have minor effects on the game outcome but still should be considered when analyzing the outcome of a game like: wards placed and destroyed.
+
+```{r, echo = FALSE, three-figures-side, fig.show="hold", out.width="33%", fig.align="center", fig.cap="Lanes, Objectives, and Tier 1 Tower."}
+knitr::include_graphics(c("lanes.png", "objectives.png", "towers.png"))
+```
+
+# Why is this model relevant?
+
+With the data obtained from Kaggle having a cutoff in each game at 10 minutes, this provides early insight to the outcome of a game. This 10 minute marker is also before the 15 minute marker, which is the amount of time needed for a game to play out before either team can choose to hold a vote for surrender. Therefore, it is vital to create a model to accurately predict whether or not one should vote to surrender based on their team's performance. Each game of League of Legends tends to last a long time, and in high ranks these games have even reached times surpassing 45 minutes to an hour. So with this analysis, we can create a model in order to prevent players from surrendering too early or surrendering at all in hopes of creating an even more competitive environment within the game where no team should be counted out too early. Furthermore, this analysis and predictive model will be used to analyze whether or not League of Legends matches always hold a 50/50 chance due to the term "scaling" where a team can wait out the time and obtain more and more objectives and become stronger than the team that obtained an early lead.
+
+```{r, echo = FALSE, two-figures-side, fig.show="hold", out.width="50%", fig.align="center", fig.cap="We scale!....Surrender Now"}
+knitr::include_graphics(c("scale.png", "surrender.jpeg"))
+
+```
+
+# Project Roadmap
+
+Now that we know the background and importance of our model, we will now discuss how we are going to build it throughout this project. There will be some initial data manipulation and cleaning, where we will then perform some exploratory data analysis to get an even more detailed idea on our variables and goal. Our goal is to use other predictor variables to predict a binary class "Win/Loss", which will be our response variable detailing whether a team wins or loses with their current statistics within the match. Then, we will perform a training/test split on our data, make a recipe, and set folds for the 5-fold cross validation we will implement. Logistic Regression, Random Forest, Elastic Net and K-Nearest Neighbor models will all be used to model the training data when we finish the setup. Whichever model performs the strongest, we will then fit to our testing data set and analyze how effective our model can truly be, or if its not as effective as we had hoped, explain why. So let's lock in and enter the Summoner's Rift!
+
+```{r, echo = FALSE, fig.show="hold", out.width="50%", fig.align="center"}
+knitr::include_graphics(c("accept2.gif", "spawn.gif"))
+```
+
+# Loading the Data
+
+We obtained our dataset through the Kaggle database with the file `high_diamond_ranked_10min.csv`. This dataset contains thousands of high ranked League matches with their stats and results. Here we will load the package. 
+
+```{r}
+# loading the data 
+league_data <- read.csv("high_diamond_ranked_10min.csv") |> clean_names() # clean_names() makes names consistent where blueWins --> blue_wins and avoids some bugs 
+head(league_data)
+dim(league_data) # checking the dimensions of my data set 
+```
+
+We have also implemented the `clean_names()` function on our dataset. This will help make names more consistent in their lettering, helping us avoid bugs later on. Then we viewed the first few results using `head()` and checked the dimensions of the dataset. Within this dataset, we have around 9,900 observations and exactly 40 variables. We are obviously not going to need all of these predictor variables, so we can do some more manipulation to get a better grasp on what needs to be done. 
+
+# Selecting Our Variables
+
+In order to improve interpretability and reduce redundancy, exploratory plots focus on a subset of variables representing economic scaling, objective control, combat outcomes, and vision.
+
+```{r}
+# Cleaning to focus on the variables we need to define a win for the side we are on, don't need red because that is for the enemy team 
+eda_vars <- league_data |>
+  select(
+    blue_wins, 
+    blue_gold_diff, blue_experience_diff, blue_cs_per_min, blue_gold_per_min,
+    blue_dragons, blue_heralds, blue_towers_destroyed, blue_elite_monsters,
+    blue_kills, blue_deaths, blue_assists, blue_first_blood, 
+    blue_wards_placed, blue_wards_destroyed, 
+    blue_avg_level, blue_total_jungle_minions_killed, blue_total_minions_killed
+  )
+```
+
+We only need the data from the blue team, meaning that red team stats are not needed, so we can filter the data accordingly and call this set `eda_vars` (our variables that we are going to use for the Exploratory Data Analysis).
+
+Now that we have taken care of that, let's take a look at each of our variables we have kept and what each of them mean. Note that we may include some variables that we don't use initially, but this is normal, as we have not viewed correlation between our variables yet, and we will adjust accordingly when it comes to EDA. However, it is important to keep all blue team variables for the overall model building later on to obtain a larger and more accurate picture of performance. 
+
+# Codebook
+
+```{r}
+# Codebook describing every variable we have 
+codebook <- tibble(
+  variable = names(eda_vars),
+  description = c(
+    "Outcome: 1 if Blue team wins, 0 otherwise",
+    "Gold difference at 10 minutes (Blue - Red)",
+    "Experience difference at 10 minutes (Blue - Red)",
+    "Blue CS per minute at 10 minutes",
+    "Blue gold per minute at 10 minutes",
+    "Number of dragons secured by Blue by 10 minutes",
+    "Number of rift heralds secured by Blue by 10 minutes",
+    "Number of towers destroyed by Blue by 10 minutes",
+    "Number of elite monsters secured by Blue by 10 minutes",
+    "Blue kills by 10 minutes",
+    "Blue deaths by 10 minutes",
+    "Blue assists by 10 minutes",
+    "Indicator that Blue got first blood (first kill of the game, 1 = yes, 0 = no)",
+    "Wards placed by Blue at 10 minutes",
+    "Wards destroyed by Blue at 10 minutes",
+    "Average level of Blue players at 10 minutes",
+    "Jungle minions killed by Blue at 10 minutes",
+    "Total minions killed by Blue at 10 minutes"
+  )
+)
+
+codebook |> kable(caption = "Codebook for variables used in EDA/modeling")
+write_csv(codebook, "codebook.csv")
+```
+
+# Preliminary Checks 
+
+## Outcome Distribution
+
+First things first, it is important to get an idea of the exact proportion and distribution of our outcome variable in order to see if there are any drastic effects on either outcome straight away. Below is a table of proportions and a distribution plot for the outcome variable `blue_wins`. As a reminder, 0 = loss for the blue team and 1 = win for the blue team. 
+
+```{r}
+eda_vars |>
+  count(blue_wins) |>
+  mutate(prop = n / sum(n)) |>
+  kable(digits = 3, caption = "Outcome Distribution (blue_wins)")
+
+ggplot(eda_vars, aes(x = factor(blue_wins))) +
+geom_bar() +
+  labs(
+    x = "Blue team win (0 = loss, 1 = win)",
+    y = "Count",
+    title = "Outcome Balance"
+  ) + 
+  theme_bw()
+```
+
+As we can see, the outcome variable is approximately balanced across wins and losses. This reveals that there are no obvious and drastic differences in proportion when it comes to the outcome variable. This also suggests baseline accuracy will be near 50% and that performance metrics such as ROC/AUC will be more informative than accuracy alone when it comes to our predictive model results.
+
+## Missing Data Check
+
+Before we dive into EDA, we want to make sure that there are no missing values in our dataset, so let's do that. 
+
+```{r}
+# No missing data
+league_data |>
+  summarise(across(everything(), ~sum(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "n_missing") |>
+  arrange(desc(n_missing)) |>
+  slice_head(n = 15) |>
+  kable(caption = "Missing Values by Variable (top 15)")
+
+```
+
+Great! There are no missing values detected in the dataset, so no imputation or removal procedures are required. We can now move onto the EDA section. 
+
+# Exploratory Data Analysis
+
+Exploratory data analysis was conducted to investigate whether early-game statistics differ between games that result in blue team victories and those that do not. Particular attention was given to economic indicators such as gold and experience advantages, as well as combat and farming metrics. 
+
+## Correlation Heat Map
+
+In order to obtain an idea of the relationships between our numeric variables, we will formulate a correlation matrix and then make a heat map of the correlation of these predictors.
+
+```{r, fig.show="hold", out.width="100%"}
+lg_mat <- eda_vars |>
+  select(-blue_wins) |>
+  cor(use = "pairwise.complete.obs")
+
+corrplot(lg_mat,
+         method = "color", 
+         type = "lower",
+         order = "hclust",
+         tl.cex = 0.8,
+         tl.srt = 45,
+         diag = FALSE)
+```
+
+Clearly, there are numerous predictors that have large correlation. To name a few, we have `blue_cs_per_min` and `blue_total_minions_killed`, `blue_gold_diff` and `blue_experience_diff`, and `blue_kills` and `blue_gold_per_min`. Since several economic predictors are strongly correlated, regularized methods such as elastic net may be useful for stabilizing coefficient estimates. 
+
+In no way shape or form are these relationships surprising, given the mechanics of League of Legends gameplay. For example, higher creep score per minute naturally leads to a larger number of total minions killed, which directly contributes to greater gold accumulation. Similarly, teams that accumulate more gold advantages often gain experience advantages as well, since both resources are generated through similar actions such as farming, securing objectives and winning skirmishes. The positive relationship between kills and gold per minute also reflects the fact that champion kills provide substantial gold rewards and allow teams to control additional map resources. 
+
+## Gold Difference by Outcome
+
+Gold difference is one of the most commonly cited indicators of early-game advantage among players in LoL. Teams that obtain more gold early in the match are able to purchase stronger items, which can lead to greater effectiveness in combat as well as control over certain areas of the map. To explore whether this economic advantage is associated with eventual match outcomes, we examine how the distribution of gold difference at the 10-minute mark varies between the games where the blue team wins and where they don't. 
+
+```{r, fig.show="hold", out.width="50%"}
+ggplot(eda_vars, aes(x = factor(blue_wins), y = blue_gold_diff)) + 
+  geom_boxplot() +
+  labs( 
+    x = "Blue Team Win (0/1)",
+    y = "Gold Difference at 10 Minutes (Blue - Red)",
+    title = "Gold Advantage at 10 minutes by Match Outcome") +
+  theme_bw() 
+
+league_data |> 
+  ggplot(aes(x = blue_gold_diff, fill = factor(blue_wins))) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 60) +
+  theme_bw() +
+  labs(
+    fill = "Blue Team Win",
+    x = "Gold Difference at 10 Minutes",
+    y = "Count",
+    title = "Distribution of Gold Difference by Match Outcome"
+  ) +
+    scale_fill_manual(values = c("#003660", "#FEBC11"))
+```
+
+The boxplot alongside the histogram show that the winning team tends to have higher gold differentials at 10 minutes, indicating early economic advantage is associated with eventual victory, though overlap suggests some games remain uncertain.
+
+## Experience Difference by Outcome
+
+Experience differences can also be a sign of early-game dominance, as teams that gain more experience will reach higher levels sooner and unlock stronger abilities and buffs earlier in the match. This section examines how the difference in experience between teams at the 10-minute mark relates to the eventual outcome of the game. If early experience advantages contribute to success later on, we would expect to see that winning teams show higher experience differences. 
+
+```{r, fig.show="hold", out.width="50%"}
+ggplot(eda_vars, aes(x = factor(blue_wins), y = blue_experience_diff)) + 
+  geom_boxplot() +
+  labs( 
+    x = "Blue Team Win (0/1)",
+    y = "Experience Difference at 10 Minutes (Blue - Red)",
+    title = "Experience Advantage at 10 Minutes by Match Outcome")
+
+ggplot(eda_vars, aes(x = blue_cs_per_min)) +
+  geom_histogram(bins = 40, fill = "#003660", color = "white") + 
+  facet_wrap(~ blue_wins, ncol = 1) +
+  theme_bw() +
+  labs(
+    title = "CS per Minute by Match Outcome",
+    x = "Blue CS per Minute",
+    y = "Count"
+  )
+```
+
+A similar pattern to gold differential occurs with examining experience differences. Winning teams generally have higher experience advantages at the 10-minute mark, suggesting that both economic and leveling advantages contribute to later victory.
+
+The distribution of creep score (CS) per minute shows modest differences between losing teams. While higher CS rates appear slightly more common among winning teams, the overlap suggests that farming efficiency alone is not a definitive predictor of victory. 
+
+## Gold per Minute by Win Outcome 
+
+Gold per minute is another measure of economy within LoL, which shows how quickly a team is obtaining resources over time. Higher gold counts may indicate stronger performance when it comes to farming, as well as success in small fights, or control over objective areas. By comparing the distribution of gold per minute between games that result in blue team wins and losses, we can investigate whether acquiring gold faster early in the match is associated with higher chances of winning the game eventually. 
+
+```{r, fig.show="hold", out.width="50%"}
+league_data |> 
+  ggplot(aes(x = blue_gold_per_min, fill = factor(blue_wins))) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 60) + 
+  theme_bw() +
+  labs(
+    fill = "Blue Team Win",
+    x = "Gold per Minute by Match Outcome",
+    y = "Count"
+  ) +
+  scale_fill_manual(values = c("#003660", "#FEBC11"))
+
+
+league_data |> 
+  ggplot(aes(x = blue_cs_per_min, y = blue_gold_per_min)) +
+  geom_point(alpha = 0.3) +
+  theme_bw() +
+  labs(
+    title = "CS per Minute vs Gold per Minute",
+    x = "CS per Minute",
+    y = "Gold per Minute"
+  )
+```
+
+The distribution of gold per minute shows that teams that eventually win tend to generate gold at a slightly higher rate early in the match. This suggests that early map control and objective pressure may translate into sustained economic advantages. 
+
+The scatterplot of CS per minute versus gold per minute reveals a strong positive relationship between the two variables. This relationship is expected, as increased minion farming contributes directly to gold accumulation. However, the spread in the data indicates that other factors, such as champion kills or objectives, also influence gold generation. 
+
+Economic variables like gold, experience, and CS tend to be strongly correlated, suggesting they capture overlapping "scaling" information. Objective and combat variables may add complementary information beyond economy alone, let us analyze one combat variable.
+
+## Blue Assists by Outcome 
+
+Assists provide insight into how frequently a team is successful in fights, as this is a measure of participation from all players on one team. Teams that have more assists early in the game may be fighting more effectively as a team and securing kills. Taking a look at the distribution of assists by match outcome allows us to explore whether early team fighting success is associated with the win. 
+
+```{r, fig.show="hold", out.width="50%"}
+league_data |> 
+  ggplot(aes(x = blue_assists, fill = factor(blue_wins))) + 
+  geom_histogram(position = "identity", alpha = 0.5, bins = 25) + 
+  theme_bw() +
+  labs(
+    fill = "Blue Team Wins",
+    x = "Assists by 10 Minutes by Match Outcome",
+    y = "Count"
+  ) +
+  scale_fill_manual(values = c("#003660", "#FEBC11"))
+```
+
+Teams that ultimately win also tend to record slightly higher assist totals at the 10-minute mark, suggesting that coordinated team fights and successful skirmishes may contribute to early advantages. 
+
+
+Overall, the exploratory analysis suggests that early economic and experience advantages are associated with an increased likelihood of winning. However, substantial overlap between winning and losing teams across several variables indicates that early-game metrics alone do not perfectly determine match outcomes. These findings motivate the use of statistical models to determine how well combinations of early-game features can predict match results. 
+
+
+# Splitting the Data into Training/Testing
+
+Before we build any type of model, we must first perform a training/testing split on our data. I decided to go with a 75/25 split for this data because the testing data set will still have a significant amount of observations, but our model should have more to train on and learn. The reason for this is because we want to avoid over-fitting, so the testing set is set aside, only to be fit once in order to assess how accurate our model truly is. We also want to set a random seed to ensure the training/testing split is the same set every time we go back and work on the following code. We stratify on our outcome variable, `blue_wins`, and we can knock down our first tower in the Summoner’s Rift, and move onto the next!
+
+```{r}
+model_df <- league_data |>
+  transmute(
+    blue_wins = factor(blue_wins),
+    gold_diff = blue_gold_diff,
+    xp_diff = blue_experience_diff,
+    blue_cs_per_min = blue_cs_per_min,
+    blue_gold_per_min = blue_gold_per_min,
+    blue_kills = blue_kills, 
+    blue_deaths = blue_deaths, 
+    blue_assists = blue_assists
+  )
+
+set.seed(1234)
+
+split <- initial_split(model_df, prop = 0.75, strata = blue_wins)
+league_train <- training(split)
+league_test <- testing(split)
+
+
+```
+
+The data was stratified on the outcome variable `blue_wins` because even with overall balance, randoms splits can still drift, so stratifying ensures that each split/fold keeps similar class proportions, performance metrics are more stable, and that our model doesn't train on a slightly skewed sample by chance.
+
+```{r}
+dim(league_train)
+```
+
+```{r}
+dim(league_test)
+```
+
+There are now 7,408 observations in the training dataset, and 2,471 observations in the testing dataset, which are both adequate values for efficiency in our model building.
+
+# Defining Our Recipe
+
+```{r}
+lol_recipe <- recipe(blue_wins ~ ., league_train) |> # defines the outcome variable blue_wins & uses all remaining columns as predictors
+  step_zv(all_predictors()) |> # remove predictors with zero variance
+  step_normalize(all_numeric_predictors()) # center and scale numeric predictors
+# No dummy step needed because everything is numeric after we define `blue_wins` as a factor. 
+```
+
+To prepare the data for modeling, a preprocessing recipe was specified using the training set. The outcome variable, `blue_wins`, was modeled as a function of all selected predictor variables. Predictors with zero variance were removed to prevent numerical issues. All numeric predictors were centered and scaled so that features were on comparable scales, which is particularly important for distance-based and regularized models such as k-nearest neighbors and elastic net. Tree-based models do not require normalization; however, a single unified recipe was used to ensure consistency across all model types.
+
+# K-Fold Cross-Validation
+
+We are going to use stratified cross-validation to preserve class proportions across folds and ensure stable performance estimates. Also, we are going to stratify on our outcome variable, `blue_wins`, just like before. 
+
+```{r}
+folds <- vfold_cv(league_train, v = 5, strata = blue_wins)
+folds
+```
+
+
+# Modeling
+
+Now for the most important part of this project, equivalent to the importance of the nexus within League of Legends: building our models. We will be trying out four different machine learning techniques all using the same recipe. This will take a while for some like random forest, while others will not take long at all. The actual model building is a straightforward process, but it takes up a lot of space, as seen below for complete transparency. I will keep this code below to show the exact steps taken to build each model. 
+I have set my metric of performance as roc_auc, because that is what shows the most significant level of efficiency in a binary classification model. This calculates the area under the curve for the receiver operating characteristic, or ROC curve, which highlights the trade-off between specificity and sensitivity. Every model built underwent a similar process (besides Logistic Regression, which only followed steps one and two):
+
+  - 1. Set up the model by specifying the type of model, setting its engine, and setting its mode which in this case was classification. 
+  
+  - 2. Set up the workflow, adding the new model, and adding the previously established recipe. 
+  
+  - 3. Set up the tuning grid with the parameters that we want tuned, and how many different levels of tuning. 
+  
+  - 4. Tune the model with certain parameters of choice. 
+  
+  - 5. Select the most accurate model from all of the tuning, finalize the workflow with those specific tuning parameters.
+  
+  - 6. Fit that model with our workflow to the training data set. 
+  
+  - 7. Save our results to an RDS file to reduce time spent running the models themselves. 
+
+```{r}
+library(dials)
+metrics <- metric_set(roc_auc, accuracy)
+
+# 1) Logistic Regression (baseline)
+log_spec <- logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification")
+
+# 2) KNN (tuned)
+knn_spec <- nearest_neighbor(neighbors = tune()) |>
+  set_engine("kknn") |>
+  set_mode("classification")
+
+# 3) Elastic Net (tuned)
+enet_spec <- logistic_reg(penalty = tune(), mixture = tune()) |>
+  set_engine("glmnet") |>
+  set_mode("classification")
+
+# 4) Random Forest (tuned)
+rf_spec <- rand_forest(mtry = tune(), min_n = tune(), trees = 300) |>
+  set_engine("ranger") |>
+  set_mode("classification")
+
+# Workflows
+log_wf <- workflow() |> add_recipe(lol_recipe) |> add_model(log_spec)
+knn_wf <- workflow() |> add_recipe(lol_recipe) |> add_model(knn_spec)
+enet_wf <- workflow() |> add_recipe(lol_recipe) |> add_model(enet_spec)
+rf_wf <- workflow() |> add_recipe(lol_recipe) |> add_model(rf_spec)
+```
+
+## Tuning Grids
+
+```{r}
+set.seed(131)
+knn_grid <- tibble(neighbors = seq(5, 55, by = 5))
+
+enet_grid <- grid_random(
+  penalty(range = c(-5, 0)),   
+  mixture(),
+  size = 20
+)
+
+rf_grid <- grid_random(
+  mtry(range = c(2,7)),
+  min_n(range = c(2, 30)),
+  size = 12
+)
+```
+
+```{r, eval = FALSE}
+# Fit/tune with CV
+log_res <- fit_resamples(log_wf, resamples = folds, metrics = metrics)
+
+knn_res <- tune_grid(knn_wf, resamples = folds, grid = knn_grid, metrics = metrics)
+
+enet_res <- tune_grid(enet_wf, resamples = folds, grid = enet_grid, metrics = metrics)
+
+rf_res <- tune_grid(rf_wf, resamples = folds, grid = rf_grid, metrics = metrics)
+
+saveRDS(log_res, file = "log_results.rds")
+saveRDS(knn_res, file = "knn_results.rds")
+saveRDS(enet_res, file = "enet_results.rds")
+saveRDS(rf_res, file = "rf_results.rds")
+```
+
+# Results of Our Models
+
+Looking at the grand scheme of things, model building itself probably took the longest out of anything in this project, including the formation of each section. In terms of an estimate, I would say it took about a week and a half to choose the ones that work the best. This involved playing around with the different settings and ways to tune the grid especially. Considering this work was all done on a 2019 MacBook Pro, we were limited when it came to power output, but we were able to make it work regardless, knocking down yet another tower, inching ourselves closer and closer to the nexus. 
+
+```{r}
+
+log_res <- readRDS("log_results.rds")
+knn_res <- readRDS("knn_results.rds")
+enet_res <- readRDS("enet_results.rds")
+rf_res <- readRDS("rf_results.rds")
+
+# Compare CV Performance
+collect_metrics(log_res)
+collect_metrics(knn_res)
+collect_metrics(enet_res)
+collect_metrics(rf_res)
+
+# Better look at model performance:
+bind_rows(
+  collect_metrics(log_res) |> mutate(model = "Logistic"), # collects metrics like above for the model, but puts a better name for organization
+  collect_metrics(knn_res) |> mutate(model = "KNN"),
+  collect_metrics(enet_res) |> mutate(model = "Elastic Net"),
+  collect_metrics(rf_res) |> mutate(model = "Random Forest")
+) |>
+  filter(.metric == "roc_auc") |> # filters the results to just show us roc_auc, the best way to determine performance
+  select(model, mean, std_err) |> # pulling, or selecting which to show us in the output: what model it is, the roc_auc mean of the model, and the standard error of the model
+  arrange(desc(mean)) |> # arranges the output based on the means, with the lowest on the bottom and the highest on the top 
+  kable(digits = 4,
+        col.names = c("Model", "Mean ROC AUC", "Std. Error"),
+        caption = "Cross-validated model comparison by ROC AUC")
+
+show_best(enet_res, metric = "roc_auc", n = 5)
+show_best(knn_res, metric = "roc_auc", n = 5)
+show_best(rf_res, metric = "roc_auc", n = 5)
+
+```
+
+We now have all of our outcomes stored for our models, so with that being said, let's get to work on the true analysis. 
+
+Model performance was evaluated using five-fold cross-validation on the training data. Models were compared using mean ROC AUC across folds. The Elastic Net model achieved the highest ROC AUC with approximately 0.8098, followed closely by the standard Logistic Regression model with approximately 0.8097 for average ROC AUC value. Since their performances were nearly identical, both models were selected for final evaluation on the testing dataset. 
+
+To proceed with the final evaluation, the best Elastic Net hyperparameters were selected using the cross-validated ROC AUC values, and the Elastic Net workflow was finalized. The Logistic Regression model does not require tuning, so its workflow was used directly. Both models were then fit on the full training dataset and used to generate predictions on the testing dataset. 
+
+```{r}
+best_enet <- select_best(enet_res, metric = "roc_auc")
+final_enet_wf <- finalize_workflow(enet_wf, best_enet)
+
+# Fitting final models on training data 
+final_enet_fit <- fit(final_enet_wf, data = league_train)
+final_log_fit <- fit(log_wf, data = league_train)
+
+# Predicting class probabilities on test set
+enet_prob <- predict(final_enet_fit, league_test, type = "prob")
+log_prob <- predict(final_log_fit, league_test, type = "prob")
+
+# Predicting classes on test set
+enet_class <- predict(final_enet_fit, league_test, type = "class")
+log_class <- predict(final_log_fit, league_test, type = "class")
+
+# Combining predictions with test data
+enet_results <- bind_cols(league_test, enet_prob, enet_class)
+log_results <- bind_cols(league_test, log_prob, log_class)
+
+# ROC AUC
+roc_auc(enet_results, truth = blue_wins, .pred_1, event_level = "second")
+roc_auc(log_results, truth = blue_wins, .pred_1, event_level = "second")
+
+# Accuracy 
+accuracy(enet_results, truth = blue_wins, estimate = .pred_class, event_level = "second")
+accuracy(log_results, truth = blue_wins, estimate = .pred_class, event_level = "second")
+
+```
+
+Both the elastic net and logistic regression models achieved nearly identical performance on the testing dataset. After correcting the ROC calculation to treat blue team wins as the event class, both models produced ROC AUC values of approximately 0.80 and classification accuracy around 71%. This indicates that early-game statistics at the 10-minute mark contain meaningful information about eventual match outcomes. However, the models are far from perfect, suggesting that while early advantages increase the probability of winning, later-game decisions and scaling factors still influence the final results.
+
+## Final Model Performance on the Testing Set
+
+### Confusion Matrix
+
+Let's take a look at the confusion matrices for our two best models
+```{r}
+conf_mat(enet_results, truth = blue_wins, estimate = .pred_class)
+conf_mat(log_results, truth = blue_wins, estimate = .pred_class)
+```
+Analyzing our confusion matrices for both of our models reveals that we have 1,755 correct predictions for our Elastic Net model (881 + 874) and 1,757 correct predictions for our Logistic Regression model (882 + 875). So, both of our models correctly classify about the same number of games with Logistic Regression performing slightly better by only 2 predictions, which is extremely small. Thus, both models perform identically on the test data. 
+
+### Model Autoplots 
+
+We will now make use of a rather informative tool when it comes to visualizing the results of our models that have been tuned. This tool is the `autoplot()` function in R. This will give us a visualization of the effects that the change in certain parameters has on our metric of choice, which in this case is `roc_auc`.
+
+Now let's take a look at the ROC curve for both of our models
+```{r}
+enet_results %>%
+  roc_curve(truth = blue_wins, .pred_1, event_level = "second") %>% # this ensures that tidymodels uses the correct event
+  autoplot()
+
+log_results %>%
+  roc_curve(truth = blue_wins, .pred_1, event_level = "second") %>% 
+  autoplot() 
+
+```
+
+As we can see above, the ROC curves for both models lie above the diagonal reference line, indicating predictive performance better than random guessing. The curves are very similar for both models, consistent with their nearly identical ROC AUC values that were approximately 0.81. This suggests that both Logistic Regression and Elastic Net provide comparable predictive performance for determining whether the blue team wins based on 10-minute game statistics.
+
+### Model Performance Summary 
+
+The predictive performance of the models was evaluated using ROC AUC and classification accuracy on the testing dataset. Among the four models considered, Elastic Net and Logistic Regression achieved the highest cross-validated ROC AUC values, with both being around 0.81. The K-Nearest Neighbors and Random Forest models performed slightly worse, suggesting that the linear models captured the relevant relationships in the data effectively. 
+
+When evaluated on the testing dataset, Elastic Net and Logistic Regression produced very similar results, much like on the training set, with classification accuracy around 71% and ROC AUC being around 0.80. The confusion matrices show that both models correctly classify the majority of matches, though some overlap between winning and losing teams remains. This indicates that while early-game statistics at the 10-minute mark provide meaningful predictive information, they do not completely determine the outcome of a match. 
+
+# Conclusion
+
+This project evaluated whether early-game statistics at the 10-minute mark can predict match outcomes in ranked League of Legends games. Several classification models were trained and evaluated using cross-validation on the training dataset. Elastic Net and Logistic Regression achieved the highest cross-validated ROC AUC values, with both being around 0.81.
+
+Final evaluation on the testing dataset showed nearly identical performance between the two models. The confusion matrices and ROC curves indicate that early-game advantages provide meaningful predictive information but do not fully determine match outcomes. This suggests that while early economic and combat advantages increase the probability of winning, later-game decisions and scaling factors still play an important role. 
+
+Future work could take into account additional variables such as champion composition, player skill differences, or time-series game events to improve predictive performance.
+
+From a gameplay perspective, this analysis reinforces an important lesson: even when the early game looks unfavorable, the outcome is far from guaranteed. Comebacks remain possible, reflecting the dynamic nature of League of Legends matches. In other words, much like in the game itself, predictive modeling may give us a strong advantage, but the match isn't truly over until the Nexus falls. 
+
+
+```{r, echo = FALSE, out.width = "100%", fig.align="center"}
+knitr::include_graphics("victory.png")
+```
