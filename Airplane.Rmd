@@ -1,0 +1,368 @@
+---
+title: "FinalOrganized"
+author: "Taylor MacKenzie"
+date: "2025-05-25"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction 
+
+There are four main forces that affect an aircraft's flight: lift, weight, thrust, and drag. Each one of them working together to determine the aircraft's trajectory. Lift is the upward force that opposes gravity, allowing it to stay in the air. Weight is the force of gravity pulling the aircraft downward. Thrust is the forward force that propels the aircraft through the air. Drag is the resistance that the air exerts on the aircraft (NASA, 2022). Lift and weight are the two forces that determine the vertical speed, and thus if lift is less than weight, vertical speed decreases while the opposite is true if lift is greater (FAA, 2023). These four main forces apply to any aircraft, including paper airplanes. In the case of paper airplanes, subtle changes to weight distribution, like where paper clips are placed, can influence how these four forces interact, especially during takeoff, gliding, and descent.
+
+While actual aircraft are desinged very meticulously, involving complex ideas and techniques, paper airplanes offer a simplified but meaningful model for analyzing aerodynamic principles. With paper clip placement, we can analyze how changes in center of gravity and weight distribution impact the flight stability and performance, leading to the overall distance the aircraft can fly. Therefore, this experiment brings us insight into the real-world engineering scenarios where the modification of an aircraft's balance can result in performance differences.
+
+For this experiment, we are analyzing specifically the effect of weight on an airplane and how it affects the lift which contributes to the distance the aircraft can travel. This can be helpful when designing an aircraft as it allows the engineers to make more aerodynamic aircraft for enhanced flight as well as continued maintenance on planes for the most optimal performance. To show this, we are using a paper airplane, constructed in one of the best ways, the Nakamura Lock formation. The Nakamura Lock formation is used in competitions for paper airplanes and is known for its incredible performance. This formation involves enhancing performance characteristics like range and endurance in order to achieve slightly higher lift coefficients, a goal in all competition paper airplanes (Gurnani/Damodaran, 2019). To analyze this, we are applying paper clips to either the nose, and/or the middle, and/or the rear of the aircraft and analyzing the flight distance of each in an effort to answer the question: Does the paper clip placement have any effect on the flight distance of the paper airplane?
+
+
+
+# Methods
+Data was obtained through a randomization of the combinations/replicates based on the sample size calculations that will be further analyzed in the Results section. The randomization code was ran to give us a random order of combinations where the paper clip was either placed on the nose, and/or the middle, and/or the rear of the paper airplane, as seen in the photos below. Then, a participant was selected to throw the paper airplane so as to add more randomness to the experiment as well as variability. The participant would stay at one end of the tape measure, placed on the ground to its full length, while data was recorded into a notebook, as photographed below. The distance was recorded in inches, the measurement consistent with the tape measure itself. The participant had the sole job of throwing the airplane from the same spot every time while the person recording would retrieve the plane after writing down the score, while also placing the paperclip on the plane in the same exact way every time. The only thing changing in this experiment was the placement of the paper clip, while everything else aimed to remain constant throughout the experiment so as to reduce technical issues in the collection of the data. This was done in order to satisfy the randomness of the experiment in the goal of obtaining meaningful data. Some technical issues that did arise during data collection involved: the participant moving for one of the throws and having to be redirected to the same spot, which may lead to slightly skewed data; furthermore, the wind did aid in one of the throws significantly leading to one major outlier in the data that can be seen in the Results section below; moreover, the tape measure only stretched so far so when the outlier throw occurred, a measurment more similar to an estimation using feet was required (walking from the end of the tape measure, heel to toe until reaching the paper airplane) and adding it to the full length of the tape measure. These were the only technical issues that arose with this experiment, which may have led to skewed results, but also a more accurate depiction of the collection of data in real-world experiments where variability is common. In terms of the statistical methods used, we used a randomization function that output a table of the exact order in which to place the paper clips as well as when to throw it, based off of the sample size calculations. Sample size calculations include the use of "power_factorial_23.R" function that outputs the power of an experiment based on the number of replicates used. In our case, we used a pilot study of a previous paper airplane experiment for our beta_mean and beta_se values, more on that in the Results section below. Additionally, a sample size graph was used to aid the experiment in a meaningful calculation of the number of replicates that would be needed to make a sound experiment, resulting in the exact number of trials that would need to be performed. Multiple graphical representations are utilized and provided below, with the linear model approach for a $2^3$ factorial experiment, or a Full Factorial experiment. Finally, model checking was performed in order to test the hypothesis that our data follows a normal distribution, an assumption needed in order to produce meaningful conclusions. Model checking involves looking at a histogram of the data along with a QQ-Plot, analyzing the resulting graphs and determining whether or not they resemble a normal distribution. If the histogram seems to resemble a bell-shaped curve and the QQ-Plot has points that follow along the line (y=x) then it is reasonable to assume based on the structure of both of those graphs that our data follows a normal distribution. However, we cannot make a definitive answer for normality until a Shapiro-Wilk test is performed, in which case, based on the p-value we make a statement on the normality of our data, similar to making a statement on significance with the same logic. If our Shapiro-Wilk Test p-value is <$\alpha=0.05$ then we reject $H_{0}$ in the case of normality which is that our data follows a normal distribution. So if we get <0.05 for a p-value, then our data violates the normality assumption. This may be the case for the data collected in this experiment due to the fact that we have an extreme outlier and the fact that more replicates could've given us more accurate results to draw from as we got 3 replicates from the first sample size calculations and for the second one it suggested a few more, however we went with the first calculations due to the fact that we used the actual values from the pilot study, believing it to be more accurate. The other tests that are run after doing the normality tests involve the structure to the data and the assumption of equal variances. These two may not be violated with this experiment as everything was done in the correct way for data collection for an experiment such as this, and therefore the structure should follow suit in terms of the necessary assumptions. This is the same case for the equal variances assumption. A definitive answer for all model-checking tests will be found later on when the tests are performed in the Results section.
+
+## Photographs 
+```{r, message=FALSE, warning=FALSE}
+knitr::include_graphics("/Users/taylormackenzie/Desktop/PSTAT 122/Planep1.pdf")
+
+knitr::include_graphics("/Users/taylormackenzie/Desktop/PSTAT 122/Planep2.pdf")
+
+knitr::include_graphics("/Users/taylormackenzie/Desktop/PSTAT 122/PData.pdf")
+```
+
+
+# Loading Data into R
+```{r, message=FALSE, warning=FALSE}
+library(readxl)
+pplane <- read_excel("PaperAirplane.xlsx", col_types= c("text",
+                                                 "text", "text",
+                                                 "numeric"))
+#To ensure that Nose, Middle, and Rear are read in as factors:
+pplane$Nose <- as.factor(pplane$Nose)
+pplane$Middle <- as.factor(pplane$Middle)
+pplane$Rear <- as.factor(pplane$Rear)
+#Renaming the distance column for ease of access:
+colnames(pplane)[4] <- "Distance"
+```
+Data was put into a data frame, while also ensuring that each placement was recognized as factors for the statistical analysis later. This makes the graphical representations more accurate and the model checking more efficient as well. Finally, the last column was renamed to Distance in order to make accessing that column much easier than the previous column name Dist. (Inches) that was put in as the name in the original Excel sheet. 
+
+# RESULTS
+
+## Sample Size Calculations
+```{r, message=FALSE, warning=FALSE}
+beta_mean <- c(203.333,-13,-66,-9.667,-47.333,-22.333,-33,-28)
+beta_se <- c(26.245,26.245,26.245,26.245,30.305,30.305,30.305,30.305)
+
+pvals <- NA
+for(j in 1:1000){
+sim_data <- data.frame(
+outcome = rep(NA, 16),
+x1 = rep(c(0,0,0,0,1,1,1,1), 2),
+x2 = rep(c(0,0,1,1,0,0,1,1), 2),
+x3 = rep(c(0,1,0,1,0,1,0,1), 2)
+)
+for(i in 1:16){
+beta <- rnorm(n=8, mean=beta_mean, sd=beta_se)
+sim_data$outcome[i] <- beta[1] +
+beta[2]*sim_data$x1[i] +
+beta[3]*sim_data$x2[i] +
+beta[4]*sim_data$x3[i] +
+beta[5]*sim_data$x1[i]*sim_data$x2[i] +
+beta[6]*sim_data$x1[i]*sim_data$x3[i] +
+beta[7]*sim_data$x2[i]*sim_data$x3[i] +
+beta[8]*sim_data$x1[i]*sim_data$x2[i]*sim_data$x3[i]
+}
+model1 <- lm(outcome ~ x1+x2+x3+x1*x2+x1*x3+x2*x3+x1*x2*x3, data=sim_data)
+f <- summary(model1)$fstatistic
+pvals[j] <- pf(f[1], f[2], f[3], lower.tail=FALSE)
+}
+power <- sum(pvals<0.05)/1000
+```
+The power received here is `r power`.
+
+## Using power_factorial_23
+```{r, message=FALSE, warning=FALSE}
+set.seed(05242025)
+source("power_factorial_23.R")
+power_pilot <- power_factorial_23(beta_mean, beta_se, 3) 
+```
+This function tells us exactly how many replicates will be needed, along with the sample size graph given below, allowing us to make an accurate experiment with proper replicates. The power received here is `r power_pilot`, this is with 3 replicates.
+
+
+## Sample Size Graph
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+set.seed(1234)
+beta_mean_modified <- c(25, -6, -18, -5, -14, -10, -11, -12)
+beta_se_modified <- c(15, 15, 15, 15, 18, 18, 18, 18)
+se_multipliers <- c(0.5,1,2) #using the pilot study values, need to vary the range and make it wider to perform a better test
+results <- data.frame()
+for(m in se_multipliers){
+  beta_se <- beta_se_modified * m
+  for(rep in 2:10){
+    
+    power <- power_factorial_23(beta_mean_modified, beta_se, replicates = rep, iter = 1000)
+    
+    results <- rbind(results, data.frame(replicates = rep, se_multiplier = as.factor(m), power=power))
+  }
+}
+
+ggplot(results, aes(x = replicates, y = power, color = se_multiplier)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "Sample Size Calculations Based on Pilot Study", x = "Replicates", y = "Power", color = "SE Multiplier") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  )
+```
+In order to conduct accurate sample size calculations and avoid the post-hoc power analysis process, a pilot study on a previous paper airplane experiment was used. This experiment was an RCBD, however it provides us with more accurate values for the beta_mean and beta_se values that can be used and is more relevant than any other experiment that we've used previously, as this is the exact same experiment but not the same method (e.g. RCBD, Full Factorial, etc...). The exact values were put into the first sample size function as well as the second, using "power_factorial_23.R", which both output accurate percentages of power for our experiment. However, in order to be as thorough as possible, we used a sample size graph to back up the second function's claim that only 3 replicates were required in order to reach at least 80% power. For the graph, we used multipliers to change the values of beta_se in order to provide a wider range of values as well as sample values for beta_mean that reflect a broader range of values rather than hyper-specific ones that apply solely to this experiment. The reason why we still chose 3 replicates is because we received a 98% power off of the "power_factorial_23.R" function and with a sensitivity analysis performed with the graph, by scaling the standard error by factors of 0.5, 1, and 2, we found that 3 replicates yield approximately >60% power under the factor of 1 while the factor of 0.5 provides us with a power of almost 1 at 3 replicates. With this information, it demonstrates a reasonable balance between power and the constraints of the experiment, while under higher uncertainty (a multiplier of 2) the curve still exhibits a steadily increasing power with the increase of replicates. So, with the optimistic pilot-based estimate of 3 replicates outputting 98%, the sensitivity analysis provides us with a justification that suggests a balance of confidence, so we choose to remain with 3 replicates for the experiment, resulting in a sample size of 24 throws total. It is always better to do as many replicates as possible, of course, but based on the data provided we can make this judgement call for lack of better terms and stick with 3 replicates for the experiment.
+
+## Randomization
+```{r, message=FALSE, warning=FALSE} 
+library(knitr)
+nose <- c("Yes", "No")
+middle <- c("Yes", "No")
+rear <- c("Yes", "No")
+
+design <- expand.grid(Nose = nose, Middle = middle, Rear = rear)
+#repeat each combination 3 times, replicates
+design_rep <- design[rep(1:nrow(design), each = 3), ]
+#randomize the order
+set.seed(123)  
+random_order <- design_rep[sample(nrow(design_rep)), ]
+#trial numbers (e.g. 1-24)
+random_order$Trial <- 1:nrow(random_order)
+kable(random_order, row.names=FALSE)
+```
+This code was used according to the sample size calculations to output a table with the required sample size that adheres to the number of replicates needed to produce meaningful statistical analysis. This code was produced using knowledge and code chunks from previous labs, with minor changes included to reflect the randomization needed for this experiment. 
+
+## Graphical Representation
+```{r, message=FALSE, warning=FALSE, fig.show="hold", out.width="50%"}
+library(ggplot2)
+library(dplyr)
+set.seed(052420257)
+theme_update(text = element_text(size = 20))
+ggplot(data=pplane, mapping=aes(x=Nose, y=Distance, color=Middle)) +
+geom_jitter(width=0.08, height=0) +
+facet_grid(cols = vars(Rear),
+labeller=labeller(Rear = c("Y" = "Rear Paperclip", "N" = "No Rear Paperclip"))) +
+ggtitle("Flight Distance by Clip Placement") +
+scale_x_discrete(name="Nose Clip", labels=c("N" = "No", "Y" = "Yes")) +
+scale_color_discrete(name="Middle Clip", labels=c("N" = "No", "Y" = "Yes"))
+
+
+ggplot(data=pplane, mapping=aes(x=Nose, y=Distance)) +
+geom_jitter(width = 0.08, height = 0) + 
+facet_grid(Middle ~ Rear, 
+          labeller =labeller(Middle=c("Y"= "Middle Paperclip",                                                                "N"="No Middle Clip"),
+                              Rear=c("Y"="Rear Paperclip",
+                                  "N"="No Rear Clip"))) +
+  scale_x_discrete(name="Nose Clip", labels =c("N" = "No", "Y" = "Yes")) +
+  ggtitle("Flight Distance by Clip Placement")
+
+ggplot(pplane, aes(x = Middle, y = Distance, fill = Middle)) +
+  geom_boxplot() +
+  facet_grid(Nose ~ Rear) +
+  ggtitle("Distance by Middle, Faceted by Nose & Rear") +
+  ylab("Distance (inches)") +
+  theme_minimal()
+
+mean_df <- pplane %>%
+  group_by(Nose, Middle, Rear) %>%
+  summarise(mean = mean(Distance), .groups = "drop")
+
+ggplot(mean_df, aes(x = Nose, y = mean, color = Middle, group = Middle)) +
+  geom_point(size = 3) +
+  geom_line(linewidth = 1) +
+  facet_grid(cols = vars(Rear)) +
+  ylab("Mean Distance (inches)") +
+  ggtitle("Interaction Plot: Nose × Middle (Faceted by Rear)") +
+  theme_minimal()
+```
+
+With each of the graphs provided above, we see very clearly the effects of the paper clip placement on the airplane. Notably, we see one value that is considered an outlier, however remains in the data as outliers are still data that need to be considered as it is part of the experiment just as much as all of the other data, even if it makes some of our graphs look rather unpleasant in some cases. Even with that outlier, however, we notice that most of the others cluster between 100-300 inches. This suggests that there may be very sensitive conditions that strongly affect distance, in other words it suggests that there may be an associated affect between paper clip placement and the flight distance. With the very first graph, we notice that across both levels of Nose and Middle, the Rear paperclip panel generally show shorter distances than the No rear panel (left). This suggests that adding a clip to the rear reduces flight distance, likely due to increased weight distribution, dragging the plane downward and reducing lift. Furthermore, we see that in the No Rear cases, the middle clip often performs worse with shorter distances being recorded while a similar effect is true in the Rear Clip cases with the Middle clip. As a result, the Middle clip might slightly mitigate the effect of the rear clip in some combinations. From the second graph, we can see a similar effect that we saw in the first suggesting that both rear and middle clips together seem to hurt performance, with the values associated with that combination producing the lowest distances overall. Finally, with the last two graphs, we have a boxplot and an interaction plot, each faceted by the presence or absence of paper clips on the nose and rear of the paper airplane and displaying the variation based on the middle placement. The only downside of the boxplot is the fact that we can't seem to make out any major trends due to the outlier that stretches our axes, making the boxplots that contain the most information an extremely small shape, leading to the analysis procedure being difficult. Despite this extreme value, we can still see that the group without any clips on the middle shows greater variability under certain conditions, indicating an effect on flight performance. However, with the interaction plot, we can see a clear interaction between the levels, as well as a similar depiction with the outlier. When there is no paperclip on the rear, there is a notable interaction between the Nose placement and the Middle placement. When there are no clips on the middle, planes with no clip on the nose travel significantly farther than those with clips on the nose. This difference decreases when clips are placed on the middle suggesting that the middle has a greater effect. When there is a paperclip on the rear, the interaction is still evident but less so. The difference in mean distances between the middle placement is smaller overall, but both configurations, with no middle and with middle, perform similarly across nose placements. 
+
+## Linear Model Analysis
+```{r, message=FALSE, warning=FALSE}
+library(knitr)
+model <- lm(Distance ~ Nose + Middle + Rear + Nose*Middle + Nose*Rear + Rear*Middle + Nose*Middle*Rear, data=pplane)
+kable(summary(model)$coefficients)
+kable(anova(model))
+```
+
+In this experiment, our null hypothesis $H_{0}$ overall as said in the introduction section, was:
+
+- $H_{0}:$ any combination of paper clip placement has NO effect on the flight distance of the paper airplane
+
+While the alternative hypothesis overall was:
+
+- $H_{A}:$ any combination of paper clip placement DOES have an effect on the flight distance of the paper airplane
+
+With the individual hypotheses for each being in the following format:
+
+- $H_{0}:$ the nose/middle/rear placement of the paperclip has NO effect on the flight distance of the paper airplane.
+- $H_{A}:$ the nose/middle/rear placement of the paperclip DOES have an effect on the flight distance of the paper airplane.
+
+Representing this mathematically, we have that:
+
+- $H_{0}: \beta_{1} = \beta_{2} = \beta_{3} = 0$
+- $H_{A}:$ At least one value of $\beta$ is not equal to zero
+
+To conduct this hypothesis test, we used the summary output of a full factorial linear model as well as an anova test (analysis of variance) to answer each of the above hypotheses. Our conclusion from the anova is that at least two individual placements, Middle and Rear, have a statistically significant effect on flight distance with a p-value of 0.049 and 0.012 respectively. So when it comes to the individual effects of Middle and Rear placement, we reject the null hypothesis, $H_{0}$, and conclude that the middle and rear placement individually on the airplane DO have an effect on the flight distance. The model summary output further supports this claim, indicating that all three main effects and most two-way interactions are statistically significant with a p-value of less than $\alpha=0.05$, including the interaction between Nose and Middle, Nose and Rear, and Middle and Rear. The only interaction that is not statistically significant in this analysis is the three-way interaction term that does not fall below $\alpha=0.05$. Furthermore, if we pull out the p-value associated with the f-statistic, reflecting the significance of the overall model:
+
+## F-Statistic and Overall P-value
+```{r, message=FALSE, warning=FALSE}
+f <- summary(model)$fstatistic
+p_value <- pf(f[1], df1=f[2], df2=f[3], lower.tail=FALSE)
+```
+We receive an overall p-value of `r p_value` which indicates that we reject the null hypothesis, $H_{0}$, and conclude that there is statistically significant evidence to say that the placement of the paper clip on the paper airplane DOES have an effect on flight distance. However, when conducting multiple hypothesis tests, it is more likely to run into false positives, so it follows that one must be conservative in their analysis. For that exact reason, we use the Bonferroni adjustment to further prove that there is an effect on the flight distance from the paper clip placement. In doing so, we receive a new $\alpha$, which is produced when we divide the current $\alpha=0.05$ by the number of tests, in this case we have 7. So we get that $\alpha=0.05/7=0.007$. This changes our conclusions entirely in the anova output, which is now that we fail to reject the null hypothesis and conclude that there is not statistically significant evidence to say that paper clip placement has an effect on flight distance. However, with our summary output, we still receive p-values that fall below $\alpha=0.007$ for both Middle and Rear placement, which is the exact same conclusion as before, meaning that there is some sort of effect individually that these two placements have. So, again, in the case of the individual effects of both Middle placement and Rear placement, we reject the null hypothesis, $H_{0}$ and conclude that the middle and rear placement of the paper clip individually have an effect on flight distance of the paper airplane. On the other hand, we fail to reject the null hypothesis $H_{0}$, when it comes to the overall significance of each term, according to the anova test and conclude that the overall effect of each term is not statistically significant to say that there is an effect on flight distance based on paperclip placement. 
+
+## Model Checking (Normality)
+```{r, message=FALSE, warning=FALSE, fig.show="hold", out.width="50%"}
+hist(model$residuals, xlab="Residuals", main="Flight Residuals")
+qqnorm(model$residuals)
+qqline(model$residuals)
+```
+Here we can see that our histogram does not necessarily follow a bell-shaped curve, which is not abnormal with this model checking technique. However, we do see that our points follow pretty closely on the line in our QQ-Plot with one major outlier being displayed on the far right. This is optimistic as it gives us an idea of normality, to be checked further with the Shapiro-Wilk Test. 
+
+### Shapiro-Wilk Test
+```{r, message=FALSE, warning=FALSE}
+res <- shapiro.test(model$residuals)
+library(knitr)
+kable(
+  data.frame(
+    Statistic = round(res$statistic, 7),
+    P_Value = round(res$p.value, 4),
+    Method = res$method
+  ),
+  caption = "Shapiro-Wilk Normality Test Results"
+)
+```
+
+The Shapiro-Wilk Normality Test p-value is `r res$p.value`. With this p-value, we reject $H_{0}$ at $\alpha=0.05$ and conclude that the residuals do not follow a normal distribution, therefore violating the normality assumption for the model. This requires a permutation test to be performed, but first we check the structure as well as the equality of variances assumptions. 
+
+### Structure to the Data:
+```{r, message=FALSE, warning=FALSE}
+x <- 1:length(model$residuals)
+plot(model$residuals ~ x, ylab="residuals", xlab="order",
+main="Structure to Data")
+```
+
+With this structure to the data, we see a mostly random scatter around zero without a clear trend along with two large outliers around points 10 and 14 which indicates either an outlier which we know we have, or a violation of the assumption of constant variance, which we check next. However, we can definitively say that the assumption of independence is mostly satisfied. 
+
+### Equality of Variances:
+```{r, message=FALSE, warning=FALSE}
+plot(model$residuals ~ model$fitted.values)
+```
+For the plot of residuals vs. fitted values, the residuals appear to be tightly clustered around 0 with no clear pattern, a good sign when it comes to model-checking. However, for the larger fitted values (the far right side), there are three extreme residuals, all very large in magnitude. This may indicate non-constant variance, specifically at high predicted values, or it indicates outliers which we know are present in the model. So from this, we gather that a violation of the constant variance assumption is likely, but for most of the data, the variance seems okay. The only matter that requires attention are the outliers.
+
+When it comes to model-checking, the null hypothesis is:
+
+- $H_{0}:$ The model residuals follow a normal distribution
+
+So, we conduct various model checking procedures to determine whether or not our model follows the requirements to be statistically meaningful, in other words following a normal distribution. Now, due to the fact that we have an outlier in our data that we have seen previously effect the output of our graphical representations and overall data, we receive a p-value from it that forces us to reject the null hypothesis and conclude that there is statistically significant evidence to say that our model's residuals do not follow a normal distribution. This calls for a permutation test.
+
+# Permutation Test:
+```{r, message=FALSE, warning=FALSE}
+perm_data <- pplane
+perm_data$Distance <- sample(perm_data$Distance)
+knitr::kable(perm_data)
+```
+```{r, message=FALSE, warning=FALSE}
+library(knitr)
+perm_model <- lm(Distance ~ Nose*Middle*Rear, data=perm_data)
+Fstat <- summary(perm_model)$fstatistic[1]
+Fmat <- matrix(Fstat, nrow=1)
+rownames(Fmat) <- "Value"
+colnames(Fmat) <- "F-Statistic"
+kable(Fmat)
+```
+The value that we care about from this output is the F-statistic, `r summary(perm_model)$fstatistic[1]`.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(05262025)
+perm_f <- NA
+reps <- 10000
+
+for(i in 1:reps){
+  perm_data <- pplane
+  perm_data$Distance <- sample(perm_data$Distance)
+  
+  perm_model <- lm(Distance ~ Nose*Middle*Rear, data=perm_data)
+  perm_f[i] <- summary(perm_model)$fstatistic[1]
+}
+
+# compare the data value to the permuted null distribution
+model1 <- lm(Distance ~ Nose*Middle*Rear, data=pplane)
+F <- summary(model1)$fstatistic[1]
+s <- sum(perm_f >= F) / reps
+```
+
+The permutation test p-value is similar to the "lm" p-value, producing a p-value <0.0001, `r s` as directly pulled from the test itself and therefore we still reject $H_{0}$ at $\alpha=0.05$ and conclude that there is statistically significant evidence that some combination of these factors influences the flight distance of the paper airplane. 
+
+As we have seen previously, the normality assumption was violated, so that suggested that our p-value was incorrect or potentially incorrect. However, to some degree the statistical tests that we perform are robust to these violations in assumptions. Given that it was only normality that was violated, and not the other two we can still make assumptions from the data itself. Our p-value is also significantly lower than $\alpha=0.05$ which is the threshold for when we really may have a problem with the violation of the normality assumption.
+
+In order to see whether or not one of the factors that we originally said had a significant effect actually do have an effect, we will perform a permutation test to get a p-value for the Middle factor to see if Middle placement alone has any impact on the flight distance of the paper airplane. The conclusion will then be reported at the appropriate Bonferroni-corrected significance level, which in this case is 0.007.
+```{r, message=FALSE, warning=FALSE}
+set.seed(123457)
+perm_t <- NA
+
+reps <- 10000
+
+for(i in 1:reps){
+  perm_data <- pplane
+  perm_data$Distance <- sample(perm_data$Distance)
+  perm_model <- lm(Distance ~ Nose*Middle*Rear, data=perm_data)
+  
+  perm_t[i] <- summary(perm_model)$coefficients[3,3]
+  
+}
+
+p <- sum(abs(perm_t) >= abs(summary(model1)$coefficients[3,3])) / reps
+```
+With the original p-value for Middle placement being 0.002, we get a p-value from the permutation test of `r p`. Therefore, at the Bonferroni-adjusted significance level of approximately 0.007, we fail to reject $H_{0}$ and conclude that there is no statistically significant evidence that Middle placement influences the flight distance of the paper airplane.
+
+Just for sanity purposes, we check the rear placement permutation test as well with an original p-value of 0.0007 and we will compare that permutation test p-value to the Bonferroni-adjusted significance level.
+```{r, message=FALSE, warning=FALSE}
+set.seed(123458)
+perm_t <- NA
+
+reps <- 10000
+
+for(i in 1:reps){
+  perm_data <- pplane
+  perm_data$Distance <- sample(perm_data$Distance)
+  perm_model <- lm(Distance ~ Nose*Middle*Rear, data=perm_data)
+  
+  perm_t[i] <- summary(perm_model)$coefficients[4,3]
+  
+}
+
+p2 <- sum(abs(perm_t) >= abs(summary(model1)$coefficients[4,3])) / reps
+```
+In this case, the permutation test yielded a p-value <0.0001, or `r p2` directly pulled from the test itself, based on 10,000 permutations, indicating strong evidence that the Rear placement significantly influences the flight distance. Comparing it to the Bonferroni-adjusted significance level, we reject $H_{0}$ and conclude that there is statistically significant evidence to suggest that the Rear placement of the paperclip has an effect on flight distance.
+
+# Discussion 
+This experiment investigated the impact of 3 factors, or the placement of paperclips on a paper airplane, on the flight distance of the aircraft using a linear model and full factorial approach. The results gathered do indicate statistically significant evidence that some combination of these factors influence the flight distance of the paper airplane. The original linear model returned a p-value below $\alpha=0.05$ at 0.01889, and a permutation test was performed for robustness that yielded a p-value <0.0001, supporting the rejection of $H_{0}$ at $\alpha=0.05$. 
+
+When evaluating the model, a major factor to consider is the assumption of normally distributed residuals. Our Shapiro-Wilk test provided evidence against normality with a p-value significantly below $\alpha=0.05$. Upon further analysis, the non-normality was found to be due primarily to a extreme residual outlier. To address this violation, a permutation test was used, which do not rely on normality and are "ideal when classical assumptions are in doubt" (Good, 2000). Both the permutation test and the original linear model returned similar conclusions, which boosts the confidence in the robustness of our findings. However, the presence of the strong outlier raises some concerns about the experimental process, perhaps measurement error, or environmental effects (wind in this case). Furthermore, even though our sample size was calculated correctly, it may be useful to conduct another experiment with a larger sample size, as we saw that with the increase in replicates, we saw an increase in power, which may bring greater precision to the experiment itself. According to the residual plots, independence of observations and constant variance of residuals were not directly violated, though a more thorough randomization of trials may provide even more accurate analysis. The analysis performed in this experiment supports the idea that certain design factors significantly influence the distance a paper airplane flies, and can also be applied to real-world applications in the aerodynamics and design of aircraft. If we were to perform this experiment again, we would most likely choose a larger sample size in order to explore the interaction effects in greater detail and draw more meaningful and accurate conclusions from the data collection.
+
+Given that we ran into the problem of a violation of normality, we can assume that our sample size was most likely underpowered. This is probably due to the fact that we used the power calculation derived from using the actual values from our pilot study, which gave us an extremely optimistic power. It would've been better to use the replicate calculation provided within the graphical representation of our sample size calculations, which may have resulted in a stronger experiment where our p-values may have been accurately composed. This brings into question the validitiy of our p-values as well. In this case, it is best to stick with the p-values derived from our permutation tests rather than the ones that were derived from the linear model. This is due to the violation of normality and the fact that the permutation tests take a more in depth approach and involve more rigorous testing. Furthermore, on the subject of potential flaws in our experiment, another one to look into is the question of whether or not this experiment applies to all paper airplanes. This is obviously not the case as our paper airplane is of a specific type, this was done purposefully to make sure the plane performed as best as it could. In order to apply this to multiple paper airplanes, an experiment will have to be run on every type of paper airplane.
+
+As a final note, this experiment and the data collected provide a powerful insight into how data is collected and how different data effects the overall behavior of the model. Specifically, we had a major outlier that had to be included regardless of the skew that it provided to the model as when it comes to data, it is important to include all of the data so as to not make our model biased and make accurate conclusions. Although we did not meet some of the requirements of a linear model such as the normality of residuals, it still proved to have an overall effect. In other words, we still were able to conclude that some combination of paperclip placements as well as some individual effects have a significant effect on flight distance, meaning that our experiment did produce accurate assumptions that can be used in analysis. Not only this, but it provided us with another option which involves conducting a future experiment where the sample size is even larger in order to produce more meaningful data than what we already have.
+
+
+# REFERENCES
+NASA Glenn Research Center. "Four Forces on an Airplane." NASA, https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/four-forces-on-an-airplane/. Last Updated July 21, 2022
+
+Gurnani, S., and M. Damodran. "Computational Aeromechanics of Paper Airplanes." Journal of Aircraft, vol. 56, no. 5, September-October 2019, pp. 2070. https://doi.org/10.2514/1.C035339.
+
+Federal Aviation Administration. "Chapter 5: Aerodynamics of Flight." Pilot’s Handbook of Aeronautical Knowledge, FAA-H-8083-25C, U.S. Department of Transportation, July 10, 2023, https://www.faa.gov/sites/faa.gov/files/07_phak_ch5_0.pdf.
+
+Good, P. (2000). Permutation Tests: A Practical Guide to Resampling Methods for Testing Hypotheses. Springer.
+
+
